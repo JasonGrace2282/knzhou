@@ -1,16 +1,15 @@
 use reqwest::blocking::Client;
 use std::{fs, io::Write, path::PathBuf};
 
-pub fn fetch_handout(client: &Client, handout: &str, output: PathBuf) {
+pub fn fetch_handout(client: &Client, handout: &str, output: PathBuf) -> Result<(), String> {
     let mut response = client
         .get(format!("https://knzhou.github.io/handouts/{}.pdf", handout))
         .send();
     if response.is_err() {
-        eprintln!(
+        return Err(format!(
             "Error fetching handout {}. Try checking your internet connection?",
             handout
-        );
-        std::process::exit(1);
+        ));
     }
     response = response.unwrap().error_for_status();
     match response {
@@ -19,15 +18,12 @@ pub fn fetch_handout(client: &Client, handout: &str, output: PathBuf) {
                 fs::File::create(output).expect("Should be able to create file in current dir");
             file.write_all(&r.bytes().unwrap())
                 .expect("Should be able to write to file");
+            Ok(())
         }
         Err(r) if matches!(r.status(), Some(reqwest::StatusCode::NOT_FOUND)) => {
-            eprintln!("Handout {} not found.", handout);
-            std::process::exit(1);
+            Err(format!("Handout {} not found.", handout))
         }
-        Err(e) => {
-            eprintln!("Error fetching handout {}: {}", handout, e);
-            std::process::exit(1);
-        }
+        Err(e) => Err(format!("Error fetching handout {}: {}", handout, e)),
     }
 }
 

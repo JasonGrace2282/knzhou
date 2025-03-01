@@ -37,7 +37,10 @@ impl Actions {
         let client = Client::new();
         if let Some(handout) = handout {
             let output = handout_output_file(&config, handout);
-            api::fetch_handout(&client, handout, output);
+            if let Err(e) = api::fetch_handout(&client, handout, output) {
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
             return;
         }
         let files = api::fetch_handouts(&client);
@@ -45,21 +48,33 @@ impl Actions {
             .tree
             .into_par_iter()
             .filter(|entry| {
-                entry
-                    .path
-                    .parent()
-                    .map(|p| p == PathBuf::from("handouts"))
-                    .is_some_and(|x| x)
+                let path = &entry.path;
+                path.extension().is_some_and(|ext| ext == "pdf")
+                    && path
+                        .parent()
+                        .map(|p| p == PathBuf::from("handouts"))
+                        .is_some_and(|x| x)
             })
             .for_each(|op| {
-                let handout = op.path.file_name().unwrap().to_str().unwrap();
+                let handout = match op.path.file_stem().and_then(|s| s.to_str()) {
+                    Some(s) => s,
+                    None => {
+                        return;
+                    }
+                };
                 let output = handout_output_file(&config, handout);
-                api::fetch_handout(&client, handout, output);
+                if let Err(e) = api::fetch_handout(&client, handout, output) {
+                    eprintln!("{}", e);
+                }
             });
     }
 }
 
 fn handout_output_file(config: &crate::Config, handout: &str) -> PathBuf {
     let cwd = std::env::current_dir().unwrap();
-    cwd.join(config.format.replace("{handout}", handout))
+    cwd.join(
+        config
+            .format
+            .replace("{handout}", &format!("{}.pdf", handout)),
+    )
 }
