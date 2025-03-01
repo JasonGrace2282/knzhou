@@ -52,8 +52,7 @@ impl Actions {
                 path.extension().is_some_and(|ext| ext == "pdf")
                     && path
                         .parent()
-                        .map(|p| p == PathBuf::from("handouts"))
-                        .is_some_and(|x| x)
+                        .is_some_and(|p| p == PathBuf::from("handouts"))
             })
             .for_each(|op| {
                 let handout = match op.path.file_stem().and_then(|s| s.to_str()) {
