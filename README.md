@@ -12,6 +12,18 @@ knzhou update E3     # install E3
 knzhou update E3Sol  # install E3 solutions
 ```
 
+### Changing the Config
+`knzhou` has a system level config file located at `~/.config/knzhou/knzhou.toml` on Unix.
+To get the location of the config file on your system, run `knzhou config get`.
+
+#### Formatting Handout Names
+In the `knzhou` config, there is a parameter called `format`. It uses the special
+value `{handout}`, which is replaced with the name of the handout. For example,
+to name `E3.pdf` as `handout-E3-best.pdf`, set it to the following
+```toml
+format = "handout-{handout}-best"
+```
+
 ## Installation
 Install [Rustup](https://www.rust-lang.org/tools/install), then run
 ```

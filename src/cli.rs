@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use rayon::iter::IntoParallelIterator;
 use reqwest::blocking::Client;
 
@@ -18,6 +18,12 @@ pub struct Args {
 #[derive(Debug, Subcommand)]
 pub enum Actions {
     Update { handout: Option<String> },
+    Config { action: ConfigActions },
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum ConfigActions {
+    Get,
 }
 
 impl Args {
@@ -30,6 +36,7 @@ impl Actions {
     pub fn execute(&self, config: crate::Config) {
         match self {
             Self::Update { handout } => self.update(config, handout),
+            Self::Config { action } => self.handle_config(config, action),
         }
     }
 
@@ -66,6 +73,17 @@ impl Actions {
                     eprintln!("{}", e);
                 }
             });
+    }
+
+    fn handle_config(&self, config: crate::Config, action: &ConfigActions) {
+        match action {
+            ConfigActions::Get => {
+                println!(
+                    "Config file located at {}",
+                    config.disk_location().display()
+                );
+            }
+        }
     }
 }
 
