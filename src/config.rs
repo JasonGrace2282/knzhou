@@ -70,12 +70,12 @@ impl Lockfile {
         if !path.exists() {
             return Lockfile::default();
         }
-        let file = std::fs::File::open(path);
-        if file.is_err() {
-            log::error!("Error opening lockfile: {}", file.unwrap_err());
+        let lock = std::fs::read_to_string(path);
+        if lock.is_err() {
+            log::error!("Error reading lockfile: {}", lock.unwrap_err());
             std::process::exit(1);
         }
-        let lockfile = serde_json::from_reader(file.unwrap());
+        let lockfile = toml::from_str(&lock.unwrap());
         if lockfile.is_err() {
             log::warn!("Error parsing lockfile: {}", lockfile.unwrap_err());
             return Default::default();
