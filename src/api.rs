@@ -3,12 +3,11 @@ use std::{fs, io::Write, path::PathBuf};
 
 pub fn fetch_handout(client: &Client, handout: &str, output: PathBuf) -> Result<(), String> {
     let mut response = client
-        .get(format!("https://knzhou.github.io/handouts/{}.pdf", handout))
+        .get(format!("https://knzhou.github.io/handouts/{handout}.pdf"))
         .send();
     if response.is_err() {
         return Err(format!(
-            "Error fetching handout {}. Try checking your internet connection?",
-            handout
+            "Error fetching handout {handout}. Try checking your internet connection?"
         ));
     }
     response = response.unwrap().error_for_status();
@@ -21,9 +20,9 @@ pub fn fetch_handout(client: &Client, handout: &str, output: PathBuf) -> Result<
             Ok(())
         }
         Err(r) if matches!(r.status(), Some(reqwest::StatusCode::NOT_FOUND)) => {
-            Err(format!("Handout {} not found.", handout))
+            Err(format!("Handout {handout} not found."))
         }
-        Err(e) => Err(format!("Error fetching handout {}: {}", handout, e)),
+        Err(e) => Err(format!("Error fetching handout {handout}: {e}")),
     }
 }
 
