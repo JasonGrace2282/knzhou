@@ -49,7 +49,7 @@ pub fn fetch_handouts(client: &Client) -> WebsiteTree {
     if tree.is_err() {
         let err = tree.unwrap_err();
         if err.is_data() {
-            log::debug!("{}", err);
+            log::debug!("{err}");
             log::error!("Outdated cli - the github api has been updated. Please reinstall knzhou.");
         } else {
             log::error!("Error parsing website tree: {}", err);
@@ -59,15 +59,16 @@ pub fn fetch_handouts(client: &Client) -> WebsiteTree {
     tree.unwrap()
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct WebsiteTree {
     pub sha: String,
     pub url: String,
     pub tree: Vec<WebsiteTreeEntry>,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct WebsiteTreeEntry {
     pub path: PathBuf,
     pub size: Option<u64>,
+    pub sha: String,
 }

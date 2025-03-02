@@ -1,4 +1,10 @@
+use std::io::Write;
+
 use serde::{Deserialize, Serialize};
+
+use crate::api;
+
+pub const LOCK_FILE: &str = "knzhou.lock.toml";
 
 const APP_NAME: &str = "knzhou";
 const CONFIG_NAME: &str = "knzhou";
@@ -48,6 +54,71 @@ impl Config {
                 log::error!("Error getting configuration file path: {}", e);
                 std::process::exit(1);
             }
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct Lockfile {
+    version: u8,
+    tree: Vec<api::WebsiteTreeEntry>,
+}
+
+impl Lockfile {
+    pub fn load() -> Self {
+        let path = std::path::PathBuf::from(LOCK_FILE);
+        if !path.exists() {
+            return Lockfile::default();
+        }
+        let file = std::fs::File::open(path);
+        if file.is_err() {
+            log::error!("Error opening lockfile: {}", file.unwrap_err());
+            std::process::exit(1);
+        }
+        let lockfile = serde_json::from_reader(file.unwrap());
+        if lockfile.is_err() {
+            log::warn!("Error parsing lockfile: {}", lockfile.unwrap_err());
+            return Default::default();
+        }
+        lockfile.unwrap()
+    }
+
+    pub fn update_entry(&mut self, entry: api::WebsiteTreeEntry) {
+        let index = self.tree.iter().position(|e| e.path == entry.path);
+        if let Some(index) = index {
+            self.tree[index] = entry;
+        } else {
+            self.tree.push(entry);
+        }
+    }
+
+    #[inline]
+    pub fn check_exists(&self, entry: &api::WebsiteTreeEntry) -> bool {
+        self.tree.iter().any(|e| e == entry)
+    }
+
+    pub fn save(&self) -> Result<(), std::io::Error> {
+        let path = std::path::PathBuf::from("knzhou.lock.toml");
+        let mut file = std::fs::File::create(path)?;
+        file.write_all(toml::to_string(self).unwrap().as_bytes())?;
+        Ok(())
+    }
+}
+
+impl Default for Lockfile {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            tree: vec![],
+        }
+    }
+}
+
+impl From<api::WebsiteTree> for Lockfile {
+    fn from(tree: api::WebsiteTree) -> Self {
+        Self {
+            version: 1,
+            tree: tree.tree,
         }
     }
 }

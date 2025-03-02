@@ -770,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "knzhou"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "confy",
@@ -780,6 +780,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "toml",
 ]
 
 [[package]]

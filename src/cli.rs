@@ -1,8 +1,10 @@
+use std::sync::RwLock;
+
 use clap::{Parser, Subcommand, ValueEnum};
 use rayon::iter::IntoParallelIterator;
 use reqwest::blocking::Client;
 
-use crate::api;
+use crate::{api, config::Lockfile};
 use rayon::prelude::*;
 use std::path::PathBuf;
 
@@ -45,20 +47,18 @@ impl Actions {
         if let Some(handout) = handout {
             let output = handout_output_file(&config, handout);
             if let Err(e) = api::fetch_handout(&client, handout, output) {
-                log::error!("{}", e);
+                log::error!("{e}");
                 std::process::exit(1);
             }
             return;
         }
+        let lockfile = RwLock::new(Lockfile::load());
         let files = api::fetch_handouts(&client);
         files
             .tree
+            .clone()
             .into_par_iter()
             .filter(|entry| {
-                log::debug!(
-                    "Checking if file path is a handout: {}",
-                    entry.path.display()
-                );
                 let path = &entry.path;
                 path.extension().is_some_and(|ext| ext == "pdf")
                     && path
@@ -66,18 +66,26 @@ impl Actions {
                         .is_some_and(|p| p == PathBuf::from("handouts"))
             })
             .for_each(|op| {
-                log::debug!("Fetching handout: {op:?}");
-                let handout = match op.path.file_stem().and_then(|s| s.to_str()) {
-                    Some(s) => s,
-                    None => {
-                        return;
-                    }
+                let Some(handout) = op.path.file_stem().and_then(|s| s.to_str()) else {
+                    return;
                 };
                 let output = handout_output_file(&config, handout);
+
+                if lockfile.read().unwrap().check_exists(&op) && output.exists() {
+                    log::debug!("Skipping handout {handout}: already up to date");
+                    return;
+                }
+                log::debug!("Fetching handout: {handout}");
                 if let Err(e) = api::fetch_handout(&client, handout, output) {
-                    log::error!("{}", e);
+                    log::error!("{e}");
+                } else {
+                    // update the lockfile upon success
+                    lockfile.write().unwrap().update_entry(op);
                 }
             });
+        if let Err(e) = lockfile.write().unwrap().save() {
+            log::warn!("Error saving lockfile: {e}");
+        }
     }
 
     fn handle_config(&self, config: crate::Config, action: &ConfigActions) {
@@ -92,9 +100,8 @@ impl Actions {
     }
 }
 
-fn handout_output_file(config: &crate::Config, handout: &str) -> PathBuf {
-    let cwd = std::env::current_dir().unwrap();
-    cwd.join(format!(
+pub fn handout_output_file(config: &crate::Config, handout: &str) -> PathBuf {
+    PathBuf::from(format!(
         "{}.pdf",
         config.format.replace("{handout}", handout)
     ))
