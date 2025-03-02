@@ -27,16 +27,16 @@ impl Config {
         let e = config.unwrap_err();
         match e {
             confy::ConfyError::BadTomlData(e) => {
-                eprintln!("Syntax error in configuration file: {}", e);
+                log::error!("Syntax error in configuration file: {}", e);
             }
-            _ => eprintln!("Error loading configuration: {}", e),
+            _ => log::error!("Error loading configuration: {}", e),
         };
         std::process::exit(1);
     }
 
     fn validate(&self) {
         if !self.format.contains("{handout}") {
-            eprintln!("Configuration format must contain {{handout}}.");
+            log::error!("Configuration format must contain {{handout}}.");
             std::process::exit(1);
         }
     }
@@ -45,7 +45,7 @@ impl Config {
         match confy::get_configuration_file_path(APP_NAME, CONFIG_NAME) {
             Ok(path) => path,
             Err(e) => {
-                eprintln!("Error getting configuration file path: {}", e);
+                log::error!("Error getting configuration file path: {}", e);
                 std::process::exit(1);
             }
         }

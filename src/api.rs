@@ -35,13 +35,13 @@ pub fn fetch_handouts(client: &Client) -> WebsiteTree {
         .send();
 
     if response.is_err() {
-        eprintln!("Could not access knzhou's website. Try checking your internet connection?");
+        log::error!("Could not access knzhou's website. Try checking your internet connection?");
         std::process::exit(1);
     }
 
     response = response.unwrap().error_for_status();
     if response.is_err() {
-        eprintln!("Error fetching handouts: {}", response.unwrap_err());
+        log::error!("Error fetching handouts: {}", response.unwrap_err());
         std::process::exit(1);
     }
 
@@ -49,11 +49,12 @@ pub fn fetch_handouts(client: &Client) -> WebsiteTree {
     if tree.is_err() {
         let err = tree.unwrap_err();
         if err.is_data() {
-            println!("{}", err);
-            eprintln!("Outdated cli - the github api has been updated. Please reinstall knzhou.");
-            std::process::exit(1);
+            log::debug!("{}", err);
+            log::error!("Outdated cli - the github api has been updated. Please reinstall knzhou.");
+        } else {
+            log::error!("Error parsing website tree: {}", err);
         }
-        panic!("Error parsing website tree: {}", err);
+        std::process::exit(1);
     }
     tree.unwrap()
 }

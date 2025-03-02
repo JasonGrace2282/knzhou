@@ -45,7 +45,7 @@ impl Actions {
         if let Some(handout) = handout {
             let output = handout_output_file(&config, handout);
             if let Err(e) = api::fetch_handout(&client, handout, output) {
-                eprintln!("{}", e);
+                log::error!("{}", e);
                 std::process::exit(1);
             }
             return;
@@ -55,6 +55,10 @@ impl Actions {
             .tree
             .into_par_iter()
             .filter(|entry| {
+                log::debug!(
+                    "Checking if file path is a handout: {}",
+                    entry.path.display()
+                );
                 let path = &entry.path;
                 path.extension().is_some_and(|ext| ext == "pdf")
                     && path
@@ -62,6 +66,7 @@ impl Actions {
                         .is_some_and(|p| p == PathBuf::from("handouts"))
             })
             .for_each(|op| {
+                log::debug!("Fetching handout: {op:?}");
                 let handout = match op.path.file_stem().and_then(|s| s.to_str()) {
                     Some(s) => s,
                     None => {
@@ -70,7 +75,7 @@ impl Actions {
                 };
                 let output = handout_output_file(&config, handout);
                 if let Err(e) = api::fetch_handout(&client, handout, output) {
-                    eprintln!("{}", e);
+                    log::error!("{}", e);
                 }
             });
     }
