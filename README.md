@@ -13,4 +13,9 @@ knzhou update E3Sol  # install E3 solutions
 ```
 
 ## Installation
-Some binaries should be published via github releases.
+Install [Rustup](https://www.rust-lang.org/tools/install), then run
+```
+rustup toolchain install 1.85  # or higher
+git clone https://github.com/JasonGrace2282/knzhou.git
+cargo install --path knzhou
+```
