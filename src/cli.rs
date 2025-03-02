@@ -71,9 +71,8 @@ impl Actions {
 
 fn handout_output_file(config: &crate::Config, handout: &str) -> PathBuf {
     let cwd = std::env::current_dir().unwrap();
-    cwd.join(
-        config
-            .format
-            .replace("{handout}", &format!("{}.pdf", handout)),
-    )
+    cwd.join(format!(
+        "{}.pdf",
+        config.format.replace("{handout}", handout)
+    ))
 }
