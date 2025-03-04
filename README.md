@@ -28,6 +28,5 @@ format = "handout-{handout}-best"
 Install [Rustup](https://www.rust-lang.org/tools/install), then run
 ```
 rustup toolchain install 1.85  # or higher
-git clone https://github.com/JasonGrace2282/knzhou.git
-cargo install --path knzhou
+cargo install --git https://github.com/JasonGrace2282/knzhou.git
 ```
