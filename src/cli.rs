@@ -79,6 +79,7 @@ impl Actions {
                 } else {
                     // update the lockfile upon success
                     lockfile.write().unwrap().update_entry(op.clone());
+                    log::info!("Updated handout: {handout}");
                 }
             });
         if let Err(e) = lockfile.write().unwrap().save() {
