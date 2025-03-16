@@ -1,7 +1,6 @@
 use std::sync::RwLock;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use rayon::iter::IntoParallelIterator;
 use reqwest::blocking::Client;
 
 use crate::{api, config::Lockfile};
@@ -56,9 +55,8 @@ impl Actions {
         let files = api::fetch_handouts(&client);
         files
             .tree
-            .clone()
-            .into_par_iter()
-            .filter(|entry| {
+            .par_iter()
+            .filter(|&entry| {
                 let path = &entry.path;
                 path.extension().is_some_and(|ext| ext == "pdf")
                     && path
@@ -71,7 +69,7 @@ impl Actions {
                 };
                 let output = handout_output_file(&config, handout);
 
-                if lockfile.read().unwrap().check_exists(&op) && output.exists() {
+                if lockfile.read().unwrap().check_exists(op) && output.exists() {
                     log::debug!("Skipping handout {handout}: already up to date");
                     return;
                 }
@@ -80,7 +78,7 @@ impl Actions {
                     log::error!("{e}");
                 } else {
                     // update the lockfile upon success
-                    lockfile.write().unwrap().update_entry(op);
+                    lockfile.write().unwrap().update_entry(op.clone());
                 }
             });
         if let Err(e) = lockfile.write().unwrap().save() {
