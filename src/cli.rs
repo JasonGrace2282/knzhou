@@ -1,6 +1,6 @@
-use std::sync::RwLock;
+use std::{path, sync::RwLock};
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use reqwest::blocking::Client;
 
 use crate::{api, config::Lockfile};
@@ -11,15 +11,23 @@ use std::path::PathBuf;
 /// up to date.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about=None)]
-pub struct Args {
+pub struct CliArgs {
     #[command(subcommand)]
     pub command: Actions,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Actions {
-    Update { handout: Option<String> },
-    Config { action: ConfigActions },
+    Update {
+        handout: Option<String>,
+    },
+    Config {
+        action: ConfigActions,
+    },
+    Hours {
+        #[command(subcommand)]
+        action: HoursActions,
+    },
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -27,7 +35,26 @@ pub enum ConfigActions {
     Get,
 }
 
-impl Args {
+#[derive(Debug, Clone, Subcommand)]
+pub enum HoursActions {
+    Log {
+        #[clap(flatten)]
+        hours: HoursLogged,
+    },
+}
+
+#[derive(Debug, Clone, Args)]
+#[group(required = true)]
+pub struct HoursLogged {
+    #[clap(default_value_t, short, long)]
+    focused: u32,
+    #[clap(default_value_t, short, long)]
+    unfocused: u32,
+}
+
+const DB_TABLE: &str = "knzhou_hours";
+
+impl CliArgs {
     pub fn execute(&self, config: crate::Config) {
         self.command.execute(config);
     }
@@ -38,7 +65,46 @@ impl Actions {
         match self {
             Self::Update { handout } => self.update(config, handout),
             Self::Config { action } => self.handle_config(config, action),
+            Self::Hours { action } => self.handle_hours(action),
         }
+    }
+
+    fn handle_hours(&self, action: &HoursActions) {
+        let Some(mut db_dir) = dirs::data_dir() else {
+            log::error!("Could not find directory to store data in!");
+            return;
+        };
+        db_dir.push("knzhou");
+
+        match action {
+            HoursActions::Log { hours } => {
+                if let Err(e) = self.add_hours(db_dir, hours) {
+                    log::error!("Error adding hours: {e}");
+                }
+            }
+        }
+    }
+
+    fn add_hours(&self, db_dir: path::PathBuf, hours: &HoursLogged) -> rusqlite::Result<()> {
+        std::fs::create_dir_all(&db_dir).expect("Should be able to create data directory.");
+        let db_path = db_dir.join("knzhou.db");
+        let conn = rusqlite::Connection::open(&db_path)?;
+        conn.execute(
+            &format!(
+                "CREATE TABLE IF NOT EXISTS {DB_TABLE} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                focused FLOAT,
+                unfocused FLOAT,
+                day DATETIME DEFAULT CURRENT_TIMESTAMP
+            );"
+            ),
+            [],
+        )?;
+        conn.execute(
+            &format!("INSERT INTO {DB_TABLE} (focused, unfocused) VALUES (?1, ?2)"),
+            [hours.focused, hours.unfocused],
+        )?;
+        Ok(())
     }
 
     fn update(&self, config: crate::Config, handout: &Option<String>) {
