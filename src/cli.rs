@@ -1,9 +1,10 @@
-use std::{path, sync::RwLock};
+use std::sync::RwLock;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use reqwest::blocking::Client;
 
-use crate::{api, config::Lockfile};
+use crate::{api, config::Lockfile, db};
+use anyhow::Result;
 use rayon::prelude::*;
 use std::path::PathBuf;
 
@@ -41,18 +42,20 @@ pub enum HoursActions {
         #[clap(flatten)]
         hours: HoursLogged,
     },
+    Show {
+        #[clap(long, default_value_t)]
+        detailed: bool,
+    },
 }
 
 #[derive(Debug, Clone, Args)]
 #[group(required = true)]
 pub struct HoursLogged {
     #[clap(default_value_t, short, long)]
-    focused: u32,
+    focused: f32,
     #[clap(default_value_t, short, long)]
-    unfocused: u32,
+    unfocused: f32,
 }
-
-const DB_TABLE: &str = "knzhou_hours";
 
 impl CliArgs {
     pub fn execute(&self, config: crate::Config) {
@@ -70,40 +73,57 @@ impl Actions {
     }
 
     fn handle_hours(&self, action: &HoursActions) {
-        let Some(mut db_dir) = dirs::data_dir() else {
-            log::error!("Could not find directory to store data in!");
+        let db_result = db::Database::new();
+        if db_result.is_err() {
+            log::error!("Error opening database: {:?}", db_result.unwrap_err());
             return;
-        };
-        db_dir.push("knzhou");
-
+        }
+        let db = db_result.unwrap();
         match action {
             HoursActions::Log { hours } => {
-                if let Err(e) = self.add_hours(db_dir, hours) {
-                    log::error!("Error adding hours: {e}");
+                let res = db.add_hours(&hours.clone().into());
+                if res.is_err() {
+                    log::error!("Error adding hours: {:?}", res.unwrap_err());
+                }
+            }
+            HoursActions::Show { detailed } => {
+                let result = self.show_hours_logged(db, *detailed);
+                if result.is_err() {
+                    log::error!("{:?}", result.unwrap_err());
                 }
             }
         }
     }
 
-    fn add_hours(&self, db_dir: path::PathBuf, hours: &HoursLogged) -> rusqlite::Result<()> {
-        std::fs::create_dir_all(&db_dir).expect("Should be able to create data directory.");
-        let db_path = db_dir.join("knzhou.db");
-        let conn = rusqlite::Connection::open(&db_path)?;
-        conn.execute(
-            &format!(
-                "CREATE TABLE IF NOT EXISTS {DB_TABLE} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                focused FLOAT,
-                unfocused FLOAT,
-                day DATETIME DEFAULT CURRENT_TIMESTAMP
-            );"
-            ),
-            [],
-        )?;
-        conn.execute(
-            &format!("INSERT INTO {DB_TABLE} (focused, unfocused) VALUES (?1, ?2)"),
-            [hours.focused, hours.unfocused],
-        )?;
+    fn show_hours_logged(&self, db: db::Database, detailed: bool) -> Result<()> {
+        if detailed {
+            let mut empty = true;
+            let lines = "-".repeat(20);
+            for row in db.detailed_hours_logged()? {
+                let db::StudySession {
+                    focused,
+                    unfocused,
+                    day,
+                } = row;
+                // a nice separator for formatting
+                if !empty {
+                    println!("{lines}")
+                }
+
+                if let Some(datetime) = day {
+                    let day = datetime.to_zoned(jiff::tz::TimeZone::system()).unwrap();
+                    println!("Study session on {}", day.date());
+                }
+                println!("Focused hours: {focused}\nUnfocused hours: {unfocused}");
+                empty = false;
+            }
+            if empty {
+                println!("No study sessions logged, lock in!!");
+            }
+        } else {
+            let (focused, unfocused) = db.total_hours_logged()?;
+            println!("Focused Studying: {focused} hours\nAdditional Studying: {unfocused} hours");
+        }
         Ok(())
     }
 
@@ -161,6 +181,22 @@ impl Actions {
                     config.disk_location().display()
                 );
             }
+        }
+    }
+}
+
+impl HoursLogged {
+    /// Returns the number of focused and unfocused hours
+    pub fn hours(&self) -> (f32, f32) {
+        (self.focused, self.unfocused)
+    }
+}
+
+impl From<db::StudySession> for HoursLogged {
+    fn from(session: db::StudySession) -> Self {
+        Self {
+            focused: session.focused,
+            unfocused: session.unfocused,
         }
     }
 }
