@@ -54,9 +54,9 @@ impl Database {
     }
 
     pub fn detailed_hours_logged(&self) -> Result<Vec<StudySession>> {
-        let mut stmt = self
-            .conn
-            .prepare(&format!("SELECT focused, unfocused, day FROM {DB_TABLE} ORDER BY day"))?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT focused, unfocused, day FROM {DB_TABLE} ORDER BY day"
+        ))?;
 
         // Create the iterator and return it as a Result
         let query = stmt.query_map([], |row| {
@@ -91,10 +91,12 @@ impl Database {
     }
 
     pub fn add_hours(&self, hours: &StudySession) -> Result<()> {
-        self.conn.execute(
-            &format!("INSERT INTO {DB_TABLE} (focused, unfocused) VALUES (?1, ?2)"),
-            [hours.focused, hours.unfocused],
-        ).with_context(|| "Adding hours to the database")?;
+        self.conn
+            .execute(
+                &format!("INSERT INTO {DB_TABLE} (focused, unfocused) VALUES (?1, ?2)"),
+                [hours.focused, hours.unfocused],
+            )
+            .with_context(|| "Adding hours to the database")?;
         Ok(())
     }
 }
